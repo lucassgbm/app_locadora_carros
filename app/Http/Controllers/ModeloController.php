@@ -17,15 +17,44 @@ class ModeloController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
-        // $modelos = Modelo::all();
-        // $modelos = $this->modelo->all();
-        return response()->json($this->modelo->with('marca')->get(), 200);
 
-        //all => cria um objeto de consulta + get -> collection 
-        // get => modifica a consulta -> collection 
+        $modelos = array();
 
+        if($request->has('atributos_marca')){
+            $atributos_marca = $request->atributos_marca;
+            $modelos = $this->modelo->with('marca:id,'.$atributos_marca);
+        }else {
+            $modelos = $this->modelo->with('marca');
+        }
+
+        if($request->has('filtro')){
+
+            $filtros = explode(';', $request->filtro);
+            foreach($filtros as $key => $filtro){
+
+                $c = explode(':', $filtro); // nome:like:%hb%
+                $modelos = $modelos->where($c[0],$c[1],$c[2]); //campo, operador, valor
+
+            }
+
+        }
+
+        if($request->has('atributos')){
+
+            $atributos = $request->atributos;
+            $modelos = $modelos->selectRaw($atributos)->get();
+
+        }
+        else{
+
+            $modelos = $modelos->get();
+        }
+        
+        
+        return response()->json($modelos, 200);
+        
     }
 
     /**
@@ -138,22 +167,27 @@ class ModeloController extends Controller
             Storage::disk('public')->delete($modelo->imagem);
         }
 
-        $request->validate($modelo->rules());
+        // $request->validate($modelo->rules());
+        
+        // arquivo config/filesystems.php
+        $imagem = $request->file('imagem');
+        $imagem_urn = $imagem->store('imagens/modelos', 'public');
+        
+        //preencher o objeto $modelo com os dados do request
+        $modelo->fill($request->all());
+        $modelo->imagem = $imagem_urn;
+        $modelo->save();
 
-         // arquivo config/filesystems.php
-         $imagem = $request->file('imagem');
-         $imagem_urn = $imagem->store('imagens/modelos', 'public');
+        //  $modelo->update([
+        //     'marca_id' => $request->marca_id,
+        //     'nome' => $request->nome,
+        //     'imagem' => $imagem_urn,
+        //     'numero_portas' => $request->numero_portas,
+        //     'lugares' => $request->lugares,
+        //     'air_bag' => $request->air_bag,
+        //     'abs' => $request->abs,
 
-         $modelo->update([
-            'marca_id' => $request->marca_id,
-            'nome' => $request->nome,
-            'imagem' => $imagem_urn,
-            'numero_portas' => $request->numero_portas,
-            'lugares' => $request->lugares,
-            'air_bag' => $request->air_bag,
-            'abs' => $request->abs,
-
-        ]);
+        // ]);
 
         return response()->json($modelo, 200);
     }
